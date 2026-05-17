@@ -11,7 +11,14 @@ LABEL org.opencontainers.image.source="${IMAGE_SOURCE}" \
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    DEBIAN_FRONTEND=noninteractive
+
+# psycopg (Python Postgres driver) needs libpq runtime at import time.
+# python:3.12-slim ships without libpq → ImportError. Install runtime lib only.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libpq5 \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd --system --gid 10001 mem0 \
     && useradd --system --uid 10001 --gid mem0 --create-home --home-dir /home/mem0 mem0
