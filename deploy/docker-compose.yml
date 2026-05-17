@@ -25,7 +25,8 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       # Override Postgres host/user with the local container names
       - POSTGRES_HOST=appdb
