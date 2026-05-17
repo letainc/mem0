@@ -92,7 +92,13 @@ require_no_latest_release_images() {
   fi
 }
 
-require_collection_suffix_matches_model() {
+require_collection_suffix_versioned() {
+  # Provider-agnostic guard. Qdrant collection vector dimensions are immutable —
+  # swapping the embedding model on an existing collection corrupts retrieval.
+  # The doctrinally-required signal that "model changed" is a bump of the _vN
+  # suffix in the collection name. The family label (_e3small, _qwen3emb8b,
+  # _voyage3l, etc.) is operator-chosen and not enforced; the version is.
+  # See documents/05-guides/agent-memory/embedding-model-selection.md.
   local model collection
   model="$(env_value "MEM0_DEFAULT_EMBEDDER_MODEL" | tr '[:upper:]' '[:lower:]')"
   collection="$(env_value "QDRANT_COLLECTION_NAME" | tr '[:upper:]' '[:lower:]')"
@@ -100,19 +106,8 @@ require_collection_suffix_matches_model() {
   [ -n "$model" ] || fail "MEM0_DEFAULT_EMBEDDER_MODEL is missing in deploy/.env.example"
   [ -n "$collection" ] || fail "QDRANT_COLLECTION_NAME is missing in deploy/.env.example"
 
-  case "$model" in
-    openai/text-embedding-3-small|text-embedding-3-small)
-      [[ "$collection" =~ _e3small_v1$ ]] \
-        || fail "openai/text-embedding-3-small requires QDRANT_COLLECTION_NAME suffix _e3small_v1"
-      ;;
-    nvidia/llama-nemotron-embed-vl-1b-v2:free|*llama-nemotron-embed-vl-1b-v2*|*nemotron*)
-      [[ "$collection" =~ _nemotronvl_v1$ ]] \
-        || fail "nvidia/llama-nemotron-embed-vl-1b-v2:free requires QDRANT_COLLECTION_NAME suffix _nemotronvl_v1"
-      ;;
-    *)
-      fail "unknown embedding model '${model}'; add an explicit collection suffix guard"
-      ;;
-  esac
+  [[ "$collection" =~ _v[0-9]+$ ]] \
+    || fail "QDRANT_COLLECTION_NAME must end with _v<N> (Qdrant dim is immutable; embedding-model swaps must bump N)"
 }
 
 require_release_workflow_shape() {
@@ -162,7 +157,7 @@ require_env_key OPENAI_API_KEY
 [ "$(env_value MEM0_VECTOR_STORE)" = "qdrant" ] || fail "MEM0_VECTOR_STORE must be qdrant in canonical deploy env"
 [[ "$(env_value QDRANT_URL)" == http://qdrant:* ]] || fail "QDRANT_URL must point to the private qdrant service"
 
-require_collection_suffix_matches_model
+require_collection_suffix_versioned
 require_no_canonical_mem0_cloud
 require_no_public_compose_binds
 require_no_latest_release_images
